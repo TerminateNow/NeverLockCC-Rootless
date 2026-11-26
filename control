@@ -1,6 +1,6 @@
 Package: com.terminatenow.neverlockcc
 Name: NeverLockCC
-Version: 1.0.3
+Version: 1.0.4
 Architecture: iphoneos-arm64
 Description: Keeps the screen on while charging (or always), with a Control Center toggle.
 Maintainer: TerminateNow

@@ -13,12 +13,11 @@
 @property (nonatomic) double totalInterval;
 @property (nonatomic) double warnInterval;
 @property (nonatomic) double quickUnwarnInterval;
+@property (nonatomic) long long timerMode;
 @end
 
 @interface SBIdleTimerDescriptorFactory : NSObject
 + (SBIdleTimerDescriptor *)disabledIdleTimerDescriptor;
-- (BOOL)updateIdleTimerSettingsForDuration:(long long)duration descriptor:(SBIdleTimerDescriptor *)descriptor;
-- (BOOL)sanitizeWarnInterval:(SBIdleTimerDescriptor *)descriptor;
 @end
 
 @interface SBIdleTimerGlobalCoordinator : NSObject
@@ -130,32 +129,30 @@ static void NLCPrefsChanged(CFNotificationCenterRef center, void *observer, CFSt
     }
     if (gCustomTimerFailed || !(total > 0) || !isfinite(total)) return descriptor;
 
+    // Leave timers SpringBoard has disabled alone.
+    SBIdleTimerDescriptor *disabled = [%c(SBIdleTimerDescriptorFactory) disabledIdleTimerDescriptor];
+    if (disabled && descriptor.timerMode == disabled.timerMode) return descriptor;
+
+    // The three intervals are absolute times from the last touch and become
+    // timeouts that must be strictly increasing: dim (warn) < quick-unwarn <
+    // lock (total). Stock 30s Auto-Lock is 20 / 22 / 30. Shift them together,
+    // keeping the stock gaps: a 60s timer becomes 50 / 52 / 60.
+    double T = gTimerSeconds;
+    double warn = descriptor.warnInterval;
+    double quick = descriptor.quickUnwarnInterval;
     SBIdleTimerDescriptor *custom = [descriptor copy];
-    BOOL usedSpringBoard = NO;
-    if ([self respondsToSelector:@selector(updateIdleTimerSettingsForDuration:descriptor:)]) {
-        // Same path SpringBoard uses for the Auto-Lock setting, so the warn /
-        // quick-unwarn intervals stay consistent with the new total.
-        [self updateIdleTimerSettingsForDuration:(long long)gTimerSeconds descriptor:custom];
-        usedSpringBoard = fabs(custom.totalInterval - gTimerSeconds) < 0.5;
-    }
-    if (!usedSpringBoard) {
-        // SpringBoard didn't take our value: set it ourselves, keeping the same
-        // gap between the dim warning and the lock as the stock timer has.
-        custom = [descriptor copy];
-        double warn = descriptor.warnInterval;
-        double lead = (warn > 0 && warn < total) ? total - warn : 0;
-        custom.totalInterval = gTimerSeconds;
-        if (lead > 0 && lead < gTimerSeconds) {
-            custom.warnInterval = gTimerSeconds - lead;
-        } else if (warn > 0 && warn < total) {
-            custom.warnInterval = warn * (gTimerSeconds / total);
+    custom.totalInterval = T;
+    if (warn > 0 && warn < total) {
+        double lead = total - warn;
+        double newWarn = lead < T ? T - lead : T * (warn / total);
+        custom.warnInterval = newWarn;
+        if (quick > warn && quick < total) {
+            double newQuick = newWarn + (quick - warn);
+            if (newQuick >= T) newQuick = newWarn + (T - newWarn) / 2;
+            custom.quickUnwarnInterval = newQuick;
         }
     }
-    if ([self respondsToSelector:@selector(sanitizeWarnInterval:)]) {
-        [self sanitizeWarnInterval:custom];
-    }
-    NLCLog(@"timer %.0fs via %@\n  stock:  %@\n  custom: %@", gTimerSeconds,
-           usedSpringBoard ? @"SpringBoard" : @"manual", descriptor, custom);
+    NLCLog(@"timer %.0fs\n  stock:  %@\n  custom: %@", T, descriptor, custom);
     return custom;
 }
 
