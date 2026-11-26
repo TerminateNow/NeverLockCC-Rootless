@@ -30,6 +30,7 @@
 
 @interface CCUIMenuModuleItem : NSObject
 @property (nonatomic, getter=isSelected) BOOL selected;
+@property (nonatomic, copy) NSString *identifier;
 - (instancetype)initWithTitle:(NSString *)title identifier:(NSString *)identifier handler:(BOOL (^)(void))handler;
 @end
 
@@ -84,6 +85,25 @@ static void NLCPrefsChanged(CFNotificationCenterRef center, void *observer, CFSt
 
 - (BOOL)_canShowWhileLocked {
     return YES;
+}
+
+// White SF Symbol shown on the left of each menu row.
+- (UIImage *)leadingImageForMenuItem:(CCUIMenuModuleItem *)item {
+    NSString *identifier = item.identifier;
+    NSArray<NSString *> *names = nil;
+    if ([identifier isEqualToString:kNLCMenuItemPrefix @"chargingRequired"]) {
+        names = @[@"battery.100.bolt", @"battery.100"];
+    } else if ([identifier isEqualToString:kNLCMenuItemPrefix @"alwaysOn"]) {
+        names = @[@"infinity"];
+    } else if ([identifier isEqualToString:kNLCMenuItemPrefix @"timer"]) {
+        names = @[@"stopwatch", @"timer"];
+    }
+    UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:17.0 weight:UIImageSymbolWeightMedium];
+    for (NSString *name in names) {
+        UIImage *image = [UIImage systemImageNamed:name withConfiguration:config];
+        if (image) return [image imageWithTintColor:[UIColor whiteColor] renderingMode:UIImageRenderingModeAlwaysOriginal];
+    }
+    return nil;
 }
 
 - (void)buttonTapped:(id)button forEvent:(id)event {
