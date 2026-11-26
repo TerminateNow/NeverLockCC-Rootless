@@ -184,11 +184,42 @@ static void NLCPrefsChanged(CFNotificationCenterRef center, void *observer, CFSt
 %end
 %end
 
+// Control Center menu rows with nothing on either side (our unselected
+// options) get their text centered, while selected rows (trailing checkmark)
+// are left-aligned, so text jumps when toggled. Keep our rows left-aligned.
+@interface CCUIMenuModuleItem : NSObject
+@property (nonatomic, copy) NSString *identifier;
+@end
+
+@interface CCUIMenuModuleItemView : UIControl
+@property (nonatomic, retain) CCUIMenuModuleItem *menuItem;
+@end
+
+%group MenuLayout
+%hook CCUIMenuModuleItemView
+
+- (BOOL)_shouldHorizontallyCenterText {
+    if ([self.menuItem.identifier hasPrefix:kNLCMenuItemPrefix]) return NO;
+    return %orig;
+}
+
+%end
+%end
+
+static BOOL gMenuLayoutInstalled = NO;
+
+static void NLCInstallMenuLayout(void) {
+    if (gMenuLayoutInstalled || !objc_getClass("CCUIMenuModuleItemView")) return;
+    %init(MenuLayout);
+    gMenuLayoutInstalled = YES;
+}
+
 %hook SpringBoard
 
 - (void)applicationDidFinishLaunching:(id)application {
     %orig;
     NLCInstallSafetyNet();
+    NLCInstallMenuLayout();
     UIDevice *device = [UIDevice currentDevice];
     device.batteryMonitoringEnabled = YES;
     [[NSNotificationCenter defaultCenter] addObserverForName:UIDeviceBatteryStateDidChangeNotification
@@ -214,6 +245,7 @@ static void NLCInstallSafetyNet(void) {
 %ctor {
     %init;
     NLCInstallSafetyNet();
+    NLCInstallMenuLayout();
     NLCLoadPrefs();
     CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, NLCPrefsChanged,
                                     CFSTR(kNLCNotification), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);

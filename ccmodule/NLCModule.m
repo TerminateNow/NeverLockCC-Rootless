@@ -69,7 +69,9 @@ static void NLCPrefsChanged(CFNotificationCenterRef center, void *observer, CFSt
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    UIImage *bolt = [UIImage systemImageNamed:@"bolt.fill"];
+    // 30% larger than the default symbol size (17 pt).
+    UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:17.0 * 1.3];
+    UIImage *bolt = [UIImage systemImageNamed:@"bolt.fill" withConfiguration:config];
     self.glyphImage = bolt;
     self.selectedGlyphImage = bolt;
     self.selectedGlyphColor = [UIColor systemOrangeColor];
@@ -112,16 +114,21 @@ static void NLCPrefsChanged(CFNotificationCenterRef center, void *observer, CFSt
         return NO; // keep the menu open
     };
 
-    CCUIMenuModuleItem *charging = [[CCUIMenuModuleItem alloc] initWithTitle:@"Charging Required" identifier:@"chargingRequired"
+    // Identifiers carry kNLCMenuItemPrefix so the SpringBoard tweak can keep
+    // these rows' text left-aligned (see CCUIMenuModuleItemView hook in Tweak.x).
+    CCUIMenuModuleItem *charging = [[CCUIMenuModuleItem alloc] initWithTitle:@"Charging Required"
+                                                                 identifier:kNLCMenuItemPrefix @"chargingRequired"
                                                                     handler:^BOOL { return set(kNLCKeyAlwaysOn, @NO); }];
     charging.selected = !alwaysOn;
 
-    CCUIMenuModuleItem *always = [[CCUIMenuModuleItem alloc] initWithTitle:@"Always On" identifier:@"alwaysOn"
+    CCUIMenuModuleItem *always = [[CCUIMenuModuleItem alloc] initWithTitle:@"Always On"
+                                                               identifier:kNLCMenuItemPrefix @"alwaysOn"
                                                                   handler:^BOOL { return set(kNLCKeyAlwaysOn, @YES); }];
     always.selected = alwaysOn;
 
     NSString *timerTitle = [NSString stringWithFormat:@"Timer (%@)", timerString];
-    CCUIMenuModuleItem *timer = [[CCUIMenuModuleItem alloc] initWithTitle:timerTitle identifier:@"timer"
+    CCUIMenuModuleItem *timer = [[CCUIMenuModuleItem alloc] initWithTitle:timerTitle
+                                                              identifier:kNLCMenuItemPrefix @"timer"
                                                                  handler:^BOOL { return set(kNLCKeyTimerEnabled, @(!timerEnabled)); }];
     timer.selected = timerEnabled;
 

@@ -14,6 +14,9 @@
 #define kNLCKeyTimerEnabled @"timerEnabled"  // BOOL, default NO
 #define kNLCKeyTimerValue   @"timerValue"    // NSString, default "10m"
 
+// Prefix for the Control Center menu item identifiers.
+#define kNLCMenuItemPrefix @"com.terminatenow.neverlockcc."
+
 #define kNLCDefaultTimerValue   @"10m"
 #define kNLCDefaultTimerSeconds 600.0
 
