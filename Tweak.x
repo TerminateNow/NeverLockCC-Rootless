@@ -37,6 +37,31 @@ static BOOL gLastActive = NO;
 // instead of crash-looping SpringBoard.
 static BOOL gCustomTimerFailed = NO;
 
+// Debug log for timer mode: /var/mobile/Library/Logs/NeverLockCC.log
+// (read it with `cat` over SSH). Kept under ~64 KB.
+static void NLCLog(NSString *format, ...) {
+    va_list args;
+    va_start(args, format);
+    NSString *message = [[NSString alloc] initWithFormat:format arguments:args];
+    va_end(args);
+    NSLog(@"[NeverLockCC] %@", message);
+
+    static NSString *path = @"/var/mobile/Library/Logs/NeverLockCC.log";
+    static NSDateFormatter *formatter;
+    if (!formatter) {
+        formatter = [NSDateFormatter new];
+        formatter.dateFormat = @"HH:mm:ss";
+    }
+    NSString *line = [NSString stringWithFormat:@"%@ %@\n", [formatter stringFromDate:[NSDate date]], message];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if ([[fm attributesOfItemAtPath:path error:nil] fileSize] > 64 * 1024) [fm removeItemAtPath:path error:nil];
+    if (![fm fileExistsAtPath:path]) [fm createFileAtPath:path contents:nil attributes:nil];
+    NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:path];
+    [handle seekToEndOfFile];
+    [handle writeData:[line dataUsingEncoding:NSUTF8StringEncoding]];
+    [handle closeFile];
+}
+
 static BOOL NLCIsOnPower(void) {
     // "Full" counts too: the phone is still on the charger, and the screen
     // should not suddenly start locking once the battery tops off.
@@ -98,19 +123,31 @@ static void NLCPrefsChanged(CFNotificationCenterRef center, void *observer, CFSt
     if (gCustomTimerFailed || !(total > 0) || !isfinite(total)) return descriptor;
 
     SBIdleTimerDescriptor *custom = [descriptor copy];
+    BOOL usedSpringBoard = NO;
     if ([self respondsToSelector:@selector(updateIdleTimerSettingsForDuration:descriptor:)]) {
         // Same path SpringBoard uses for the Auto-Lock setting, so the warn /
         // quick-unwarn intervals stay consistent with the new total.
         [self updateIdleTimerSettingsForDuration:(long long)gTimerSeconds descriptor:custom];
-    } else {
-        double scale = gTimerSeconds / total;
+        usedSpringBoard = fabs(custom.totalInterval - gTimerSeconds) < 0.5;
+    }
+    if (!usedSpringBoard) {
+        // SpringBoard didn't take our value: set it ourselves, keeping the same
+        // gap between the dim warning and the lock as the stock timer has.
+        custom = [descriptor copy];
+        double warn = descriptor.warnInterval;
+        double lead = (warn > 0 && warn < total) ? total - warn : 0;
         custom.totalInterval = gTimerSeconds;
-        custom.warnInterval = descriptor.warnInterval * scale;
-        custom.quickUnwarnInterval = descriptor.quickUnwarnInterval * scale;
+        if (lead > 0 && lead < gTimerSeconds) {
+            custom.warnInterval = gTimerSeconds - lead;
+        } else if (warn > 0 && warn < total) {
+            custom.warnInterval = warn * (gTimerSeconds / total);
+        }
     }
     if ([self respondsToSelector:@selector(sanitizeWarnInterval:)]) {
         [self sanitizeWarnInterval:custom];
     }
+    NLCLog(@"timer %.0fs via %@\n  stock:  %@\n  custom: %@", gTimerSeconds,
+           usedSpringBoard ? @"SpringBoard" : @"manual", descriptor, custom);
     return custom;
 }
 
@@ -124,13 +161,15 @@ static void NLCPrefsChanged(CFNotificationCenterRef center, void *observer, CFSt
 %hook ITIdleTimerDescriptor
 
 - (void)setTimeouts:(NSArray *)timeouts {
+    BOOL ours = gTimerEnabled && NLCShouldBeActive();
+    if (ours) NLCLog(@"setTimeouts: %@", timeouts);
     @try {
         %orig;
     } @catch (NSException *exception) {
         // Not our custom timer: don't hide SpringBoard's own failures.
-        if (gCustomTimerFailed || !gTimerEnabled || !NLCShouldBeActive()) @throw;
+        if (gCustomTimerFailed || !ours) @throw;
         gCustomTimerFailed = YES;
-        NSLog(@"[NeverLockCC] SpringBoard rejected custom timer (%@); falling back to stock Auto-Lock", exception.reason);
+        NLCLog(@"SpringBoard rejected custom timer: %@ — falling back to stock Auto-Lock, timer switched off", exception.reason);
         dispatch_async(dispatch_get_main_queue(), ^{
             NLCSetValue(kNLCKeyTimerEnabled, @NO);
         });
