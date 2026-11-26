@@ -8,7 +8,8 @@ on:
 jobs:
   build:
     # macOS/Xcode is needed for the new arm64e ABI that iOS 14+ requires.
-    runs-on: macos-latest
+    # Intel image: macOS arm64 hosted runners were too capacity-constrained to pick up jobs.
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
 
