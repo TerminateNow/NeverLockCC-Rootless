@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     # macOS/Xcode is needed for the new arm64e ABI that iOS 14+ requires.
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
