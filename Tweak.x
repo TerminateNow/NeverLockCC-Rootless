@@ -36,6 +36,8 @@ static BOOL gLastActive = NO;
 // Set if SpringBoard ever rejects our custom timer, so we stop producing it
 // instead of crash-looping SpringBoard.
 static BOOL gCustomTimerFailed = NO;
+static BOOL gSafetyNetInstalled = NO;
+static void NLCInstallSafetyNet(void);
 
 // Debug log for timer mode: /var/mobile/Library/Logs/NeverLockCC.log
 // (read it with `cat` over SSH). Kept under ~64 KB.
@@ -120,6 +122,12 @@ static void NLCPrefsChanged(CFNotificationCenterRef center, void *observer, CFSt
     // Custom timeout. Only adjust a real, finite timer; if SpringBoard has
     // already disabled it (e.g. Auto-Lock set to Never) leave it alone.
     double total = descriptor.totalInterval;
+    NLCInstallSafetyNet();
+    // Never hand SpringBoard a custom timer unless a rejection can be caught.
+    if (!gSafetyNetInstalled) {
+        NLCLog(@"safety net not installed; using stock timer");
+        return descriptor;
+    }
     if (gCustomTimerFailed || !(total > 0) || !isfinite(total)) return descriptor;
 
     SBIdleTimerDescriptor *custom = [descriptor copy];
@@ -183,6 +191,7 @@ static void NLCPrefsChanged(CFNotificationCenterRef center, void *observer, CFSt
 
 - (void)applicationDidFinishLaunching:(id)application {
     %orig;
+    NLCInstallSafetyNet();
     UIDevice *device = [UIDevice currentDevice];
     device.batteryMonitoringEnabled = YES;
     [[NSNotificationCenter defaultCenter] addObserverForName:UIDeviceBatteryStateDidChangeNotification
@@ -196,9 +205,18 @@ static void NLCPrefsChanged(CFNotificationCenterRef center, void *observer, CFSt
 
 %end
 
+// IdleTimerHosting may not be loaded yet when the tweak's constructor runs,
+// so retry until ITIdleTimerDescriptor exists.
+static void NLCInstallSafetyNet(void) {
+    if (gSafetyNetInstalled || !objc_getClass("ITIdleTimerDescriptor")) return;
+    %init(SafetyNet);
+    gSafetyNetInstalled = YES;
+    NLCLog(@"safety net installed");
+}
+
 %ctor {
     %init;
-    if (objc_getClass("ITIdleTimerDescriptor")) %init(SafetyNet);
+    NLCInstallSafetyNet();
     NLCLoadPrefs();
     CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), NULL, NLCPrefsChanged,
                                     CFSTR(kNLCNotification), NULL, CFNotificationSuspensionBehaviorDeliverImmediately);
