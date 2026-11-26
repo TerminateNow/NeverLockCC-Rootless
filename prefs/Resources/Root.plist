@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>title</key>
+	<string>NeverLockCC</string>
+	<key>items</key>
+	<array>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Keeps the screen on while the charger is plugged in. Also available from the Control Center module.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>label</key>
+			<string>Enabled</string>
+			<key>key</key>
+			<string>enabled</string>
+			<key>default</key>
+			<true/>
+		</dict>
+
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>footerText</key>
+			<string>Keep the screen on without needing a charger.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>label</key>
+			<string>Always On Mode</string>
+			<key>key</key>
+			<string>alwaysOn</string>
+			<key>default</key>
+			<false/>
+		</dict>
+
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Inactivity Timer</string>
+			<key>footerText</key>
+			<string>Instead of staying on forever, turn the screen off after this much inactivity. Enter seconds (600) or minutes ending in "m" (10m). The time is kept when the timer is off.</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>label</key>
+			<string>Use Timer</string>
+			<key>key</key>
+			<string>timerEnabled</string>
+			<key>default</key>
+			<false/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSEditTextCell</string>
+			<key>label</key>
+			<string>Timeout</string>
+			<key>key</key>
+			<string>timerValue</string>
+			<key>default</key>
+			<string>10m</string>
+			<key>placeholder</key>
+			<string>600 or 10m</string>
+			<key>noAutoCorrect</key>
+			<true/>
+			<key>autoCaps</key>
+			<string>none</string>
+		</dict>
+	</array>
+</dict>
+</plist>
